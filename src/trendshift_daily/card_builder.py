@@ -82,6 +82,35 @@ def build_collapsible_panel(title: str, items: List[str]) -> Dict[str, Any]:
         ]
     }
 
+def build_curated_panel(curated: List[Dict[str, Any]], title_prefix: str = "🌟 小兔精选深度研判") -> Dict[str, Any]:
+    """将小兔精选包裹在原生折叠面板内，默认收起，用户点开自主查看。"""
+    inner_elements = []
+    for idx, item in enumerate(curated):
+        inner_elements.append({
+            "tag": "markdown",
+            "content": format_repo_line(item)
+        })
+        if idx < len(curated) - 1:
+            inner_elements.append({
+                "tag": "hr"
+            })
+            
+    return {
+        "tag": "collapsible_panel",
+        "expanded": False,
+        "header": {
+            "title": {
+                "tag": "plain_text",
+                "content": f"{title_prefix}（共 {len(curated)} 个项目 · 点击展开）"
+            }
+        },
+        "border": {
+            "color": "orange",
+            "corner_radius": "6px"
+        },
+        "elements": inner_elements
+    }
+
 def build_feishu_cards(
     day: str,
     summary: Dict[str, Any],
@@ -103,28 +132,25 @@ def build_feishu_cards(
         "tag": "markdown",
         "content": (
             f"【抓取时间】{fetched_at}（北京时间）· 五榜共 {total} 个去重仓库\n"
-            f"【研判结论】**🔥 必看 {must_c} 个** · **✨ 推荐 {rec_c} 个** · **📌 关注 {watch_c} 个** · **⚠️ 一票否决 {rej_c} 个**"
+            f"【研判结论】**🔥 必看 {must_c} 个** · **✨ 推荐 {rec_c} 个** · **📌 关注 {watch_c} 个** · **⚠️ 一票否决 {rej_c} 个**\n"
+            f"<font color='grey'>精选深度研判与原始榜单已全量默认收入抽屉，点击标题即可展开细看。</font>"
         )
     }
     
-    # 2. 精选列表
-    curated_elements = []
+    # 2. 精选列表 (默认全部收进折叠抽屉)
+    curated_panels = []
     if curated:
-        curated_elements.append({
-            "tag": "markdown",
-            "content": "**🌟 小兔精选（点击仓库名直达 GitHub · 深度研判）**"
-        })
-        for idx, item in enumerate(curated):
-            curated_elements.append({
-                "tag": "markdown",
-                "content": format_repo_line(item)
-            })
-            if idx < len(curated) - 1:
-                curated_elements.append({
-                    "tag": "hr"
-                })
+        chunk_size = 8
+        if len(curated) <= chunk_size:
+            curated_panels.append(build_curated_panel(curated))
+        else:
+            for c_idx in range(0, len(curated), chunk_size):
+                chunk = curated[c_idx:c_idx + chunk_size]
+                part_title = f"🌟 小兔精选 ({c_idx+1}~{c_idx+len(chunk)})"
+                panel = build_curated_panel(chunk, title_prefix=part_title)
+                curated_panels.append(panel)
         
-    # 3. 折叠面板列表
+    # 3. 原始榜单抽屉列表
     board_titles = {
         "daily": "日榜原文（今日 UTC）",
         "weekly": "周榜原文",
@@ -132,12 +158,12 @@ def build_feishu_cards(
         "yearly": "年榜原文",
         "github_trending": "GitHub Trending 历史原文"
     }
-    panels = []
+    raw_panels = []
     for k in ["daily", "weekly", "monthly", "yearly", "github_trending"]:
         if k in raw_boards:
-            panels.append(build_collapsible_panel(board_titles[k], raw_boards[k]))
+            raw_panels.append(build_collapsible_panel(board_titles[k], raw_boards[k]))
             
-    all_elements = [header_element] + curated_elements + panels
+    all_elements = [header_element] + curated_panels + raw_panels
     
     # 4. 拆页封包计算
     WRAPPER_OVERHEAD = 1000
