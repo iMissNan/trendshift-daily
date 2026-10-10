@@ -1,5 +1,5 @@
 """Trendshift 日报 · 飞书交互卡片渲染器。
-实现 F10(卡片渲染与拆页)。附带直接跳转链接、专业中文描述、折叠面板与优雅拆页。
+实现 F10(卡片渲染与拆页)。附带直接跳转链接、专业中文描述、专属设计感徽章、折叠面板与优雅拆页。
 """
 import json
 from typing import Dict, Any, List
@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 CARD_BYTE_LIMIT = 25000  # 飞书单卡 JSON 保守上限
 
 def format_repo_line(item: Dict[str, Any]) -> str:
-    """按规范渲染单个仓库的卡片正文 (带 GitHub 跳转超链接 + 全角标点 + 严谨依凭)。"""
+    """按规范渲染单个仓库的卡片正文 (高阶设计感标签 + GitHub 超链接 + 全角标点 + 严谨依凭)。"""
     repo = item["repo"]
     url = item.get("url") or f"https://github.com/{repo}"
     tag = item.get("tag", "关注")
@@ -16,13 +16,25 @@ def format_repo_line(item: Dict[str, Any]) -> str:
     
     # 飞书 markdown 超链接语法: [标题](url)
     repo_link = f"[{repo}]({url})"
-    streak_tag = f"连续 {streak} 天" if streak > 1 else ""
+    
+    # 设计感视觉标签 (采用 emoji + 醒目排版符号 + 色彩语义化)
+    tag_badge_map = {
+        "必看": "🔥 <font color='red'>【必看】</font>",
+        "推荐": "✨ <font color='green'>【推荐】</font>",
+        "关注": "📌 <font color='blue'>【关注】</font>",
+        "观望": "🔍 <font color='grey'>【观望】</font>",
+        "不推荐": "⚠️ <font color='grey'>【不推荐】</font>"
+    }
+    tag_badge = tag_badge_map.get(tag, f"【{tag}】")
+    
+    # 连续上榜设计勋章
+    streak_part = f" ` 连续 {streak} 天 ` " if streak > 1 else ""
     
     if rejected:
         reason = item.get("reject_reason", "已归档或超长期停更")
         evidence = item.get("evidence", "GitHub API")
         return (
-            f"**~~{repo_link}~~**  `[不推荐]`\n"
+            f"**~~{repo_link}~~**  {tag_badge}\n"
             f"**状态：**{reason}\n"
             f"<font color='grey'>【依据来源】{evidence}</font>"
         )
@@ -31,9 +43,8 @@ def format_repo_line(item: Dict[str, Any]) -> str:
     for_us = item.get("for_us", "保持技术追踪")
     evidence = item.get("evidence", "meta.description")
     
-    streak_part = f" `{streak_tag}`" if streak_tag else ""
     return (
-        f"**{repo_link}**  `[{tag}]`{streak_part}\n"
+        f"**{repo_link}**  {tag_badge}{streak_part}\n"
         f"**简介：**{what}\n"
         f"**价值：**{for_us}\n"
         f"<font color='grey'>【依据来源】{evidence}</font>"
@@ -92,7 +103,7 @@ def build_feishu_cards(
         "tag": "markdown",
         "content": (
             f"【抓取时间】{fetched_at}（北京时间）· 五榜共 {total} 个去重仓库\n"
-            f"【研判结论】**必看 {must_c} 个** · **推荐 {rec_c} 个** · **关注 {watch_c} 个** · **一票否决 {rej_c} 个**"
+            f"【研判结论】**🔥 必看 {must_c} 个** · **✨ 推荐 {rec_c} 个** · **📌 关注 {watch_c} 个** · **⚠️ 一票否决 {rej_c} 个**"
         )
     }
     
@@ -101,7 +112,7 @@ def build_feishu_cards(
     if curated:
         curated_elements.append({
             "tag": "markdown",
-            "content": "**小兔精选（点击仓库名直达 GitHub · 深度研判）**"
+            "content": "**🌟 小兔精选（点击仓库名直达 GitHub · 深度研判）**"
         })
         for idx, item in enumerate(curated):
             curated_elements.append({
