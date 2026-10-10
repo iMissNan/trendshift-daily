@@ -137,12 +137,8 @@ def run_pipeline(config_path: str, dry_run: bool = False, target_day: str = "") 
             "reject_reason": reject_reason
         })
         
-    # 排序精选区：必看 -> 推荐 -> 关注 -> 不推荐
-    tag_order = {"必看": 0, "推荐": 1, "关注": 2, "观望": 3, "不推荐": 4}
-    curated_items.sort(key=lambda x: (tag_order.get(x["tag"], 99), -x.get("streak", 1)))
-    
-    # 精选区截断到上限条数
-    displayed_curated = curated_items[:featured_cap]
+    # 严格收敛精选区：非必看全部取消，仅保留真正高价值的【必看】项目
+    displayed_curated = [item for item in curated_items if item["tag"] == "必看"][:featured_cap]
     
     summary = {
         "fetched_at": manifest.get("fetched_at", datetime.now().isoformat()),
@@ -159,7 +155,8 @@ def run_pipeline(config_path: str, dry_run: bool = False, target_day: str = "") 
         day=day,
         summary=summary,
         curated=displayed_curated,
-        raw_boards=raw_boards
+        raw_boards=raw_boards,
+        notes=existing_notes
     )
     
     logger.info("卡片组装完成，生成 %d 页卡片", len(cards))

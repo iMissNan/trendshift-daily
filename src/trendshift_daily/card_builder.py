@@ -1,8 +1,8 @@
 """Trendshift 日报 · 飞书交互卡片渲染器。
-实现 F10(卡片渲染与拆页)。附带直接跳转链接、专业中文描述、专属设计感徽章、折叠面板与优雅拆页。
+实现 F10(卡片渲染与拆页)。附带直接跳转链接、专业中文描述、专属设计感徽章、双列表格折叠抽屉与细粒度拆页。
 """
 import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 CARD_BYTE_LIMIT = 25000  # 飞书单卡 JSON 保守上限
 
@@ -10,7 +10,7 @@ def format_repo_line(item: Dict[str, Any]) -> str:
     """按规范渲染单个仓库的卡片正文 (高阶设计感标签 + GitHub 超链接 + 全角标点 + 严谨依凭)。"""
     repo = item["repo"]
     url = item.get("url") or f"https://github.com/{repo}"
-    tag = item.get("tag", "关注")
+    tag = item.get("tag", "必看")
     streak = item.get("streak", 1)
     rejected = item.get("rejected", False)
     
@@ -50,72 +50,85 @@ def format_repo_line(item: Dict[str, Any]) -> str:
         f"<font color='grey'>【依据来源】{evidence}</font>"
     )
 
-def build_collapsible_panel(title: str, items: List[str]) -> Dict[str, Any]:
-    """构建飞书原生折叠面板 (默认收起，每个条目附带 GitHub 直跳链接)。"""
-    formatted_lines = []
-    for i, s in enumerate(items, 1):
-        repo_name = s.split()[0]
-        extra = s[len(repo_name):].strip()
-        extra_str = f" {extra}" if extra else ""
-        link_str = f"[{repo_name}](https://github.com/{repo_name}){extra_str}"
-        formatted_lines.append(f"{i}. {link_str}")
+def build_collapsible_table_panel(
+    title: str,
+    items: List[str],
+    notes: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
+    """构建双列表格折叠面板，单表超过 15 条自动拆为子抽屉，防单个面板超限。"""
+    notes = notes or {}
+    chunk_size = 15
+    panels = []
+    
+    if not items:
+        return [{
+            "tag": "collapsible_panel",
+            "expanded": False,
+            "header": {
+                "title": {"tag": "plain_text", "content": f"{title}（0 条）"}
+            },
+            "border": {"color": "orange", "corner_radius": "6px"},
+            "elements": [{"tag": "markdown", "content": "（本榜无数据）"}]
+        }]
         
-    lines = "\n".join(formatted_lines) or "（本榜无数据）"
-    return {
-        "tag": "collapsible_panel",
-        "expanded": False,
-        "header": {
-            "title": {
-                "tag": "plain_text",
-                "content": f"{title}（{len(items)} 条）"
-            }
-        },
-        "border": {
-            "color": "orange",
-            "corner_radius": "6px"
-        },
-        "elements": [
-            {
-                "tag": "markdown",
-                "content": lines
-            }
-        ]
-    }
-
-def build_curated_panel(curated: List[Dict[str, Any]], title_prefix: str = "🌟 小兔精选深度研判") -> Dict[str, Any]:
-    """将小兔精选包裹在原生折叠面板内，默认收起，用户点开自主查看。"""
-    inner_elements = []
-    for idx, item in enumerate(curated):
-        inner_elements.append({
-            "tag": "markdown",
-            "content": format_repo_line(item)
-        })
-        if idx < len(curated) - 1:
-            inner_elements.append({
-                "tag": "hr"
-            })
+    for chunk_idx in range(0, len(items), chunk_size):
+        chunk_items = items[chunk_idx:chunk_idx + chunk_size]
+        table_rows = ["| 仓库名称 | 核心功能简介 |", "| :--- | :--- |"]
+        for s in chunk_items:
+            repo_name = s.split()[0]
+            desc = notes.get(repo_name, {}).get("what_it_is") or "暂无详细简介"
+            desc_clean = desc.replace("|", "\\|").replace("\n", " ").strip()
+            table_rows.append(f"| [{repo_name}](https://github.com/{repo_name}) | {desc_clean} |")
             
-    return {
-        "tag": "collapsible_panel",
-        "expanded": False,
-        "header": {
-            "title": {
-                "tag": "plain_text",
-                "content": f"{title_prefix}（共 {len(curated)} 个项目 · 点击展开）"
-            }
-        },
-        "border": {
-            "color": "orange",
-            "corner_radius": "6px"
-        },
-        "elements": inner_elements
-    }
+        table_content = "\n".join(table_rows)
+        suffix = f" ({chunk_idx+1}~{chunk_idx+len(chunk_items)})" if len(items) > chunk_size else f"（{len(items)} 条）"
+        panels.append({
+            "tag": "collapsible_panel",
+            "expanded": False,
+            "header": {
+                "title": {"tag": "plain_text", "content": f"{title}{suffix} · 表格速览"}
+            },
+            "border": {"color": "orange", "corner_radius": "6px"},
+            "elements": [{"tag": "markdown", "content": table_content}]
+        })
+        
+    return panels
+
+def build_curated_panel(curated: List[Dict[str, Any]], title_prefix: str = "🌟 小兔精选必看研判") -> List[Dict[str, Any]]:
+    """将小兔精选包裹在原生折叠面板内，若条数过多自动切分。"""
+    if not curated:
+        return []
+    chunk_size = 8
+    panels = []
+    for c_idx in range(0, len(curated), chunk_size):
+        chunk = curated[c_idx:c_idx + chunk_size]
+        inner_elements = []
+        for idx, item in enumerate(chunk):
+            inner_elements.append({
+                "tag": "markdown",
+                "content": format_repo_line(item)
+            })
+            if idx < len(chunk) - 1:
+                inner_elements.append({"tag": "hr"})
+                
+        suffix = f" ({c_idx+1}~{c_idx+len(chunk)})" if len(curated) > chunk_size else f"（共 {len(curated)} 个项目）"
+        panels.append({
+            "tag": "collapsible_panel",
+            "expanded": False,
+            "header": {
+                "title": {"tag": "plain_text", "content": f"{title_prefix}{suffix} · 点击展开"}
+            },
+            "border": {"color": "orange", "corner_radius": "6px"},
+            "elements": inner_elements
+        })
+    return panels
 
 def build_feishu_cards(
     day: str,
     summary: Dict[str, Any],
     curated: List[Dict[str, Any]],
-    raw_boards: Dict[str, List[str]]
+    raw_boards: Dict[str, List[str]],
+    notes: Optional[Dict[str, Any]] = None
 ) -> List[Dict[str, Any]]:
     """装配飞书卡片列表，超过 CARD_BYTE_LIMIT 自动细粒度拆页。"""
     
@@ -133,24 +146,14 @@ def build_feishu_cards(
         "content": (
             f"【抓取时间】{fetched_at}（北京时间）· 五榜共 {total} 个去重仓库\n"
             f"【研判结论】**🔥 必看 {must_c} 个** · **✨ 推荐 {rec_c} 个** · **📌 关注 {watch_c} 个** · **⚠️ 一票否决 {rej_c} 个**\n"
-            f"<font color='grey'>精选深度研判与原始榜单已全量默认收入抽屉，点击标题即可展开细看。</font>"
+            f"<font color='grey'>已严格收敛精选区（仅保留必看深度研判），下方各榜单均升级为双列表格展示。</font>"
         )
     }
     
-    # 2. 精选列表 (默认全部收进折叠抽屉)
-    curated_panels = []
-    if curated:
-        chunk_size = 8
-        if len(curated) <= chunk_size:
-            curated_panels.append(build_curated_panel(curated))
-        else:
-            for c_idx in range(0, len(curated), chunk_size):
-                chunk = curated[c_idx:c_idx + chunk_size]
-                part_title = f"🌟 小兔精选 ({c_idx+1}~{c_idx+len(chunk)})"
-                panel = build_curated_panel(chunk, title_prefix=part_title)
-                curated_panels.append(panel)
+    # 2. 精选必看列表
+    curated_panels = build_curated_panel(curated)
         
-    # 3. 原始榜单抽屉列表
+    # 3. 原始榜单抽屉列表 (双列表格形态: 项目名 + 核心功能说明)
     board_titles = {
         "daily": "日榜原文（今日 UTC）",
         "weekly": "周榜原文",
@@ -161,7 +164,7 @@ def build_feishu_cards(
     raw_panels = []
     for k in ["daily", "weekly", "monthly", "yearly", "github_trending"]:
         if k in raw_boards:
-            raw_panels.append(build_collapsible_panel(board_titles[k], raw_boards[k]))
+            raw_panels.extend(build_collapsible_table_panel(board_titles[k], raw_boards[k], notes=notes))
             
     all_elements = [header_element] + curated_panels + raw_panels
     
