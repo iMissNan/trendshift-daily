@@ -1,0 +1,39 @@
+# Trendshift 日报配置(F1–F13 共用)
+source:
+  base: "https://trendshift.io"
+  boards:
+    daily: "/"
+    weekly: "/weekly"
+    monthly: "/monthly"
+    yearly: "/yearly"
+    github_trending: "/github-trending-repositories"
+  scroll_rounds: 6
+  board_min_items: 20          # F1 校验下限,低于判该榜失败
+github:
+  api: "https://api.github.com"
+  raw: "https://raw.githubusercontent.com"
+  request_interval_s: 0.3
+  stale_days: 730              # F8 过时否决阈值
+  recent_days_must: 90         # F6 必看:近 90 天有更新
+  recent_days_recommend: 180   # F6 推荐
+  recent_days_follow: 365      # F6 关注上界
+readme:
+  max_chars: 8000
+  head_chars: 6000
+  tail_chars: 2000
+  cache_days: 30
+analysis:
+  model: "yangmao"             # 老板 2026-10-09 选定,JSON 实测 3/3
+  endpoint: "http://127.0.0.1:20128/v1/chat/completions"
+  key_env: "HERMES_CUSTOM_HOME_NANSHARK_CCWU_CC_20128_API_KEY"
+  retry_on_bad_json: 1
+  cache_days: 30
+tagging:
+  must_daily_cap: 3            # 老板 2026-10-09 决定:必看每天最多 3
+card:
+  featured_cap: 25             # 老板 2026-10-09 决定:精选区 25 条
+  page_byte_limit: 25000
+feishu:
+  chat_id: "oc_3f7b32bd23561d97c50c63b0e34895a8"
+  env_file: "~/.hermes/.env"
+data_root: "~/data/trendshift"
