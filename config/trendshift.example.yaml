@@ -1,0 +1,46 @@
+# Trendshift Daily 示例配置
+source:
+  base: "https://trendshift.io"
+  boards:
+    daily: "/"
+    weekly: "/weekly"
+    monthly: "/monthly"
+    yearly: "/yearly"
+    github_trending: "/github-trending-repositories"
+  scroll_rounds: 6
+  board_min_items: 20
+
+github:
+  api: "https://api.github.com"
+  raw: "https://raw.githubusercontent.com"
+  request_interval_s: 0.3
+  stale_days: 730
+  recent_days_must: 90
+  recent_days_recommend: 180
+  recent_days_follow: 365
+
+readme:
+  max_chars: 8000
+  head_chars: 6000
+  tail_chars: 2000
+  cache_days: 30
+
+analysis:
+  model: "yangmao"
+  endpoint: "http://127.0.0.1:20128/v1/chat/completions"
+  key_env: "LLM_API_KEY"
+  retry_on_bad_json: 1
+  cache_days: 30
+
+tagging:
+  must_daily_cap: 3
+
+card:
+  featured_cap: 25
+  page_byte_limit: 25000
+
+feishu:
+  chat_id: "your_feishu_chat_id_here"
+  env_file: "~/.trendshift/.env"
+
+data_root: "./data"
